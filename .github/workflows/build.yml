@@ -1,0 +1,39 @@
+name: Build Magic Lantern CN
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-500d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi python3-pip
+          pip3 install docutils
+
+      - name: Build ML
+        run: |
+          cd platform/500D.111
+          make clean
+          make -j$(nproc)
+          # Include Chinese font
+          cp ../../data/FONTS.DAT build/ML/data/ 2>/dev/null || true
+      
+      - name: Upload autoexec.bin
+        uses: actions/upload-artifact@v4
+        with:
+          name: 500D_CN_autoexec
+          path: platform/500D.111/build/autoexec.bin
+      
+      - name: Upload ML directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: 500D_CN_ML
+          path: |
+            platform/500D.111/build/ML/
+            platform/500D.111/build/ML-SETUP.FIR

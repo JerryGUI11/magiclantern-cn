@@ -371,7 +371,7 @@ char* get_shootmode_name(int shooting_mode)
         shooting_mode == SHOOTMODE_CA ?         "CA" :
         shooting_mode == SHOOTMODE_AP ?         "A+" :
         shooting_mode == SHOOTMODE_ADEP ?       "ADEP" :
-        shooting_mode == SHOOTMODE_AUTO ?       "Auto" :
+        shooting_mode == SHOOTMODE_AUTO ?       "自动" :
         shooting_mode == SHOOTMODE_LANDSCAPE ?  "Landscape" :
         shooting_mode == SHOOTMODE_PORTRAIT ?   "Portrait" :
         shooting_mode == SHOOTMODE_NOFLASH ?    "NoFlash" :
@@ -637,7 +637,7 @@ const char * lens_format_iso(int raw_iso)
     }
     else
     {
-        snprintf(iso, sizeof(iso), SYM_ISO"Auto");
+        snprintf(iso, sizeof(iso), SYM_ISO"自动");
     }
 
     return iso;
@@ -673,6 +673,16 @@ void draw_ml_topbar()
 static volatile int lv_focus_requests = 0;
 static volatile int lv_focus_done = 1;
 static volatile int lv_focus_error = 0;
+
+/* 500D CDAF speed optimization: set PROP_LV_FOCUS_CMD to full speed before stepping */
+static void lens_focus_set_full_speed(void)
+{
+    #ifdef CONFIG_FOCUS_COMMANDS_PROP_NOT_CONFIRMED
+    /* 3002 = full speed, reduces motor settling time per step */
+    static const int full_speed = 3002;
+    prop_request_change(PROP_LV_FOCUS_CMD, &full_speed, 4);
+    #endif
+}
 
 // 70D focus features don't play well with this and
 // soft limit is reached very quickly
@@ -737,7 +747,7 @@ PROP_HANDLER( PROP_LV_FOCUS_DONE )
 static void
 lens_focus_wait(void)
 {
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < 50; i++)
     {
         if (lv_focus_done) return;
         if (lv_focus_error) return;
@@ -798,10 +808,12 @@ lens_focus(
                 /* todo: VxWorks cameras may require this too */
                 extern volatile int pfAfComplete_counter;
 
+                lens_focus_set_full_speed();
+
                 int old = pfAfComplete_counter;
                 while (pfAfComplete_counter == old)
                 {
-                    msleep(20);
+                    msleep(5);  /* optimized from 20ms */
                 }
 
                 /* send focus command */
@@ -809,12 +821,8 @@ lens_focus(
 
                 /* wait for confirmation from PROP_LV_FOCUS_DONE */
                 lens_focus_wait();
-
-                old = pfAfComplete_counter;
-                while (pfAfComplete_counter == old)
-                {
-                    msleep(20);
-                }
+                /* Note: removed redundant second pfAfComplete wait;
+                   PROP_LV_FOCUS_DONE already confirms the command completed */
 #else
                 /* request and wait for confirmation */
                 prop_request_change_wait(PROP_LV_LENS_DRIVE_REMOTE, &focus_cmd, 4, 1000);
@@ -1309,8 +1317,8 @@ mvr_create_logfile(
         lens_info.wb_mode == 5 ? " - Flash" : 
         lens_info.wb_mode == 6 ? " - Custom" : 
         lens_info.wb_mode == 8 ? " - Shade" : " - unknown",
-        lens_info.wbs_gm > 0 ? "Green" : "Magenta", ABS(lens_info.wbs_gm), 
-        lens_info.wbs_ba > 0 ? "Amber" : "Blue", ABS(lens_info.wbs_ba)
+        lens_info.wbs_gm > 0 ? "绿色" : "品红", ABS(lens_info.wbs_gm), 
+        lens_info.wbs_ba > 0 ? "Amber" : "蓝色", ABS(lens_info.wbs_ba)
         );
 
     #ifdef FEATURE_PICSTYLE
@@ -2060,7 +2068,7 @@ PROP_HANDLER(PROP_HALF_SHUTTER)
 static struct menu_entry lens_menus[] = {
     #ifdef FEATURE_MOVIE_LOGGING
     {
-        .name = "Movie Logging",
+        .name = "短片日志",
         .priv = &movie_log,
         .max = 1,
         .help = "Save metadata for each movie, e.g. MVI_1234.LOG",
@@ -2267,8 +2275,8 @@ static struct menu_entry lens_info_menus[] = {
 void
 crop_factor_menu_init()
 {
-    menu_add("Prefs", tweak_menus, COUNT(tweak_menus));
-    menu_add("Debug", lens_info_menus, COUNT(lens_info_menus));
+    menu_add("设置", tweak_menus, COUNT(tweak_menus));
+    menu_add("调试", lens_info_menus, COUNT(lens_info_menus));
 
     /* hack: lens name is usually long */
     /* force all submenu values to the left to maintain a nice layout */
@@ -3185,12 +3193,12 @@ static LVINFO_UPDATE_FUNC(wb_update)
             (uniwb_is_active()      ? "UniWB"  :
             (lens_info.wb_mode == 0 ? "AutoWB" : 
             (lens_info.wb_mode == 1 ? "Sunny"  :
-            (lens_info.wb_mode == 2 ? "Cloudy" : 
+            (lens_info.wb_mode == 2 ? "阴天" : 
             (lens_info.wb_mode == 3 ? "Tungst." : 
             (lens_info.wb_mode == 4 ? "Fluor."  : 
-            (lens_info.wb_mode == 5 ? "Flash"   : 
-            (lens_info.wb_mode == 6 ? "Custom"  : 
-            (lens_info.wb_mode == 8 ? "Shade"   :
+            (lens_info.wb_mode == 5 ? "闪光灯"   : 
+            (lens_info.wb_mode == 6 ? "自定义"  : 
+            (lens_info.wb_mode == 8 ? "阴影"   :
              "unk")))))))))
         );
     }
@@ -3363,19 +3371,19 @@ static struct lvinfo_item info_items[] = {
         .priority = -1,
     },
     {
-        .name = "Aperture",
+        .name = "光圈",
         .which_bar = LV_BOTTOM_BAR_ONLY,
         .update = av_update,
         .priority = 1,
     },
     {
-        .name = "Shutter",
+        .name = "快门",
         .which_bar = LV_BOTTOM_BAR_ONLY,
         .update = tv_update,
         .priority = 1,
     },
     {
-        .name = "ISO",
+        .name = "感光度",
         .which_bar = LV_BOTTOM_BAR_ONLY,
         .update = iso_update,
         .priority = 1,
@@ -3387,7 +3395,7 @@ static struct lvinfo_item info_items[] = {
         .priority = 1,
     },
     {
-        .name = "Focus dist",
+        .name = "对焦距离",
         .which_bar = LV_BOTTOM_BAR_ONLY,
         .update = focus_dist_update,
     },
