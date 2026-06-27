@@ -809,6 +809,104 @@ focus_task( void* unused )
 
 TASK_CREATE( "focus_task", focus_task, 0, 0x18, 0x1000 );
 
+/* ==============================================================
+ * Video Continuous Autofocus (Servo AF)
+ * Uses focus peaking edge data as a sharpness proxy.
+ * During recording, periodically checks if the image is going
+ * out of focus and applies small focus corrections.
+ * ============================================================== */
+static CONFIG_INT( "video.af", video_af_enabled, 0 );
+static CONFIG_INT( "video.af.sensitivity", video_af_sensitivity, 5 );
+static CONFIG_INT( "video.af.check.interval", video_af_check_interval, 10 );
+
+static void
+video_af_task( void* unused )
+{
+    static int last_score = 0;
+    static int consecutive_drops = 0;
+    static int search_direction = 1;
+
+    TASK_LOOP
+    {
+        msleep(video_af_check_interval * 100);
+        
+        if (!video_af_enabled) continue;
+        if (!RECORDING_H264_STARTED) continue;
+        if (is_manual_focus()) continue;
+        if (!lv || mirror_down) continue;
+        if (lens_info.job_state) continue;
+        
+        /* Read current focus quality from peaking data */
+        int current_score = get_video_af_score();
+        
+        if (last_score > 0 && current_score > 0)
+        {
+            int drop = last_score - current_score;
+            
+            if (drop > video_af_sensitivity * last_score / 100)
+            {
+                /* Focus is degrading - try a correction */
+                consecutive_drops++;
+                
+                if (consecutive_drops >= 2)
+                {
+                    /* Do a small focus hunt: step forward, check, reverse if worse */
+                    int pre_score = current_score;
+                    lens_focus(1, search_direction, 1, 0);
+                    msleep(50);
+                    
+                    int post_score = get_video_af_score();
+                    
+                    if (post_score < pre_score)
+                    {
+                        /* Wrong direction, reverse */
+                        search_direction = -search_direction;
+                        lens_focus(1, search_direction, 1, 0);
+                    }
+                    
+                    consecutive_drops = 0;
+                }
+            }
+            else
+            {
+                consecutive_drops = 0;
+            }
+        }
+        
+        last_score = current_score;
+    }
+}
+
+TASK_CREATE( "video_af_task", video_af_task, 0, 0x1c, 0x1000 );
+
+static struct menu_entry video_af_menu[] = {
+    {
+        .name   = "Video AF (Servo)",
+        .help   = "Continuous autofocus while recording. Uses focus peaking data.",
+        .help2  = "Requires Global Draw + Focus Peak enabled.",
+        .priv   = &video_af_enabled,
+        .min    = 0,
+        .max    = 1,
+        .choices = CHOICES("Off", "On"),
+    },
+    {
+        .name   = "AF Sensitivity",
+        .help   = "How much sharpness drop triggers refocus (lower = more sensitive).",
+        .priv   = &video_af_sensitivity,
+        .min    = 1,
+        .max    = 50,
+        .update = MENU_UPDATE_FUNC(printf("%d%%", video_af_sensitivity)),
+    },
+    {
+        .name   = "Check Interval",
+        .help   = "Time between focus checks, in 100ms units.",
+        .priv   = &video_af_check_interval,
+        .min    = 2,
+        .max    = 50,
+        .update = MENU_UPDATE_FUNC(printf("%dms", video_af_check_interval*100)),
+    },
+};
+
 static MENU_UPDATE_FUNC(follow_focus_print)
 {
     if (follow_focus) MENU_SET_VALUE(
@@ -1337,6 +1435,11 @@ focus_init( void* unused )
 
     #ifdef FEATURE_AF_PATTERNS
     afp_menu_init();
+    #endif
+
+    #ifdef CONFIG_FOCUS_COMMANDS_PROP_NOT_CONFIRMED
+    /* Video continuous AF for 500D-class cameras */
+    menu_add( "Focus", video_af_menu, COUNT(video_af_menu) );
     #endif
 }
 
