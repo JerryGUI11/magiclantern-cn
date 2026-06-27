@@ -674,14 +674,27 @@ static volatile int lv_focus_requests = 0;
 static volatile int lv_focus_done = 1;
 static volatile int lv_focus_error = 0;
 
-/* 500D CDAF speed optimization: set PROP_LV_FOCUS_CMD to full speed before stepping */
+/*
+ * 500D LiveView CDAF speed optimization:
+ * Set Canon's internal focus motor speed register to maximum.
+ * Applied both when LiveView starts (affects Canon's own CDAF)
+ * and before each ML focus step (affects manual focus tools).
+ */
 static void lens_focus_set_full_speed(void)
 {
     #ifdef CONFIG_FOCUS_COMMANDS_PROP_NOT_CONFIRMED
-    /* 3002 = full speed, reduces motor settling time per step */
     static const int full_speed = 3002;
     prop_request_change(PROP_LV_FOCUS_CMD, &full_speed, 4);
     #endif
+}
+
+/* Hook LiveView activation to set AF speed for Canon's own CDAF */
+PROP_HANDLER( PROP_LV_ACTION )
+{
+    if (buf[0] == 0)  /* LV_START */
+    {
+        lens_focus_set_full_speed();
+    }
 }
 
 // 70D focus features don't play well with this and
