@@ -46,4 +46,7 @@ void focus_stack_run(int skip_frame);
 /* focus racking */
 void rack_focus_start_now( void * priv, int delta );
 int is_rack_focus_enabled();
+
+/* video continuous AF */
+int video_af_needs_peak_data();
 #endif
