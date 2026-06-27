@@ -72,6 +72,8 @@ int handle_livev_playback(struct event * event);
 int is_focus_peaking_enabled();
 int focus_peaking_as_display_filter();
 void peak_disp_filter();    /* CBR called from tweaks.c */
+int get_video_af_score();   /* in-focus pixel count for video AF */
+int get_video_af_score_pct(); /* in-focus pixel percentage (x1000) */
 
 /* spotmeter */
 int get_spot_motion(int dxb, int xcb, int ycb, int draw);
