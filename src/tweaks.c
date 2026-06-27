@@ -3405,7 +3405,7 @@ void display_filter_step(int k)
     #endif
     
     #ifdef FEATURE_FOCUS_PEAK_DISP_FILTER
-    if (focus_peaking_as_display_filter())
+    if (focus_peaking_as_display_filter() || video_af_needs_peak_data())
     {
         if (k % 1 == 0)
             BMP_LOCK( if (lv) peak_disp_filter(); )
