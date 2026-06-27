@@ -819,6 +819,12 @@ static CONFIG_INT( "video.af", video_af_enabled, 0 );
 static CONFIG_INT( "video.af.sensitivity", video_af_sensitivity, 5 );
 static CONFIG_INT( "video.af.check.interval", video_af_check_interval, 10 );
 
+/* Exported: tells zebra/tweaks to run peak filter for AF data */
+int video_af_needs_peak_data()
+{
+    return video_af_enabled && RECORDING_H264_STARTED && lv && !is_manual_focus();
+}
+
 static void
 video_af_task( void* unused )
 {
