@@ -825,6 +825,32 @@ int video_af_needs_peak_data()
     return video_af_enabled && RECORDING_H264_STARTED && lv && !is_manual_focus();
 }
 
+/* Standalone edge detection - works without CONFIG_DISPLAY_FILTERS.
+   Samples a small region of the BMP VRAM to compute sharpness.
+   Returns: sum of absolute horizontal edge differences (higher = sharper) */
+static int video_af_compute_score()
+{
+    int score = 0;
+    int count = 0;
+    BMP_LOCK(
+        uint8_t *vram = bmp_vram();
+        if (vram) {
+            int x0 = 200, y0 = 150, w = 320, h = 180;
+            int stride = 720; /* 500D bmp stride */
+            for (int y = y0; y < y0 + h; y += 8) {
+                for (int x = x0; x < x0 + w - 1; x += 8) {
+                    /* Compute horizontal edge: Y channel difference */
+                    int idx = y * stride + x;
+                    int d = abs(vram[idx] - vram[idx + 1]);
+                    score += d;
+                    count++;
+                }
+            }
+        }
+    )
+    return count > 10 ? score * 100 / count : 0;
+}
+
 static void
 video_af_task( void* unused )
 {
@@ -843,7 +869,7 @@ video_af_task( void* unused )
         if (lens_info.job_state) continue;
         
         /* Read current focus quality from peaking data */
-        int current_score = get_video_af_score();
+        int current_score = video_af_compute_score();
         
         if (last_score > 0 && current_score > 0)
         {
