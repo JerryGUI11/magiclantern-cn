@@ -16,7 +16,3 @@
 #undef FEATURE_MOVIE_RESTART /* https://bitbucket.org/hudson/magic-lantern/issue/1008/500d-movie-restart-function-is-not-working */
 
 #define FEATURE_REC_NOTIFY_BEEP
-
-/* Enable focus peaking display filter for Video AF sharpness scoring.
-   Only runs when Video AF is enabled during recording. */
-#define FEATURE_FOCUS_PEAK_DISP_FILTER
