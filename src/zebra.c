@@ -310,6 +310,12 @@ static CONFIG_INT( "focus.peaking.thr", focus_peaking_pthr, 5); // 1%
 static CONFIG_INT( "focus.peaking.color", focus_peaking_color, 7); // R,G,B,C,M,Y,cc1,cc2
 CONFIG_INT( "focus.peaking.grayscale", focus_peaking_grayscale, 0); // R,G,B,C,M,Y,cc1,cc2
 
+/* Video continuous AF: per-frame focus quality score, updated by peak filter */
+static int video_af_score = 0;
+static int video_af_score_total = 0;
+int get_video_af_score() { return video_af_score; }
+int get_video_af_score_pct() { return video_af_score_total ? video_af_score * 1000 / video_af_score_total : 0; }
+
 #if defined(CONFIG_DISPLAY_FILTERS) && defined(FEATURE_FOCUS_PEAK_DISP_FILTER)
 static CONFIG_INT( "focus.peaking.disp", focus_peaking_disp, 0); // display as dots or blended
 #else
@@ -1646,6 +1652,10 @@ void FAST peak_disp_filter()
     thr = COERCE(thr, 10, 255);
     
     if (focus_peaking_disp == 3) thr = 64;
+
+    /* update video AF score: percentage of "in-focus" pixels in the peaking filter */
+    video_af_score = n_over;
+    video_af_score_total = n_total;
 }
 #endif
 
