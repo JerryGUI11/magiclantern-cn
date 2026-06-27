@@ -832,22 +832,26 @@ static int video_af_compute_score()
 {
     int score = 0;
     int count = 0;
+    uint8_t *vram = bmp_vram();
+    if (!vram) return 0;
+    
+    int x0 = 200, y0 = 150;
+    int w = 320, h = 180;
+    int stride = 720; /* 500D bmp stride */
+    int y, x;
+    
     BMP_LOCK(
-        uint8_t *vram = bmp_vram();
-        if (vram) {
-            int x0 = 200, y0 = 150, w = 320, h = 180;
-            int stride = 720; /* 500D bmp stride */
-            for (int y = y0; y < y0 + h; y += 8) {
-                for (int x = x0; x < x0 + w - 1; x += 8) {
-                    /* Compute horizontal edge: Y channel difference */
-                    int idx = y * stride + x;
-                    int d = abs(vram[idx] - vram[idx + 1]);
-                    score += d;
-                    count++;
-                }
+        for (y = y0; y < y0 + h; y += 8)
+            for (x = x0; x < x0 + w - 1; x += 8)
+            {
+                int idx = y * stride + x;
+                int d = vram[idx] - vram[idx + 1];
+                if (d < 0) d = -d;
+                score += d;
+                count++;
             }
-        }
     )
+    
     return count > 10 ? score * 100 / count : 0;
 }
 
