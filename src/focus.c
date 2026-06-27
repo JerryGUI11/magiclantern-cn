@@ -879,6 +879,16 @@ video_af_task( void* unused )
 
 TASK_CREATE( "video_af_task", video_af_task, 0, 0x1c, 0x1000 );
 
+static MENU_UPDATE_FUNC(video_af_sens_update)
+{
+    MENU_SET_VALUE("%d%%", video_af_sensitivity);
+}
+
+static MENU_UPDATE_FUNC(video_af_interval_update)
+{
+    MENU_SET_VALUE("%dms", video_af_check_interval * 100);
+}
+
 static struct menu_entry video_af_menu[] = {
     {
         .name   = "Video AF (Servo)",
@@ -895,7 +905,7 @@ static struct menu_entry video_af_menu[] = {
         .priv   = &video_af_sensitivity,
         .min    = 1,
         .max    = 50,
-        .update = MENU_UPDATE_FUNC(printf("%d%%", video_af_sensitivity)),
+        .update = video_af_sens_update,
     },
     {
         .name   = "Check Interval",
@@ -903,7 +913,7 @@ static struct menu_entry video_af_menu[] = {
         .priv   = &video_af_check_interval,
         .min    = 2,
         .max    = 50,
-        .update = MENU_UPDATE_FUNC(printf("%dms", video_af_check_interval*100)),
+        .update = video_af_interval_update,
     },
 };
 
